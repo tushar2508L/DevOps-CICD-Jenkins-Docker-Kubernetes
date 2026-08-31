@@ -4,6 +4,7 @@ pipeline {
     environment {
         DOCKER_IMAGE = "tushar25l/devops-react-app"
         DOCKER_TAG = "${BUILD_NUMBER}"
+        K8S_SERVER = "ubuntu@172.31.13.155"
     }
 
     stages {
@@ -16,7 +17,7 @@ pipeline {
 
         stage('Build React App') {
             steps {
-                sh 'npm install'
+                sh 'npm ci'
                 sh 'npm run build'
             }
         }
@@ -39,6 +40,7 @@ pipeline {
                     sh '''
                         echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
                         docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+                        docker logout
                     '''
                 }
             }
@@ -46,12 +48,14 @@ pipeline {
 
         stage('Deploy to Kubernetes') {
             steps {
-                sh '''
-                    kubectl set image deployment/reactapp-deployment \
-                    reactapp=${DOCKER_IMAGE}:${DOCKER_TAG}
-                    
-                    kubectl rollout status deployment/reactapp-deployment
-                '''
+                sh """
+                    ssh -o StrictHostKeyChecking=no ${K8S_SERVER} '
+                        kubectl set image deployment/reactapp-deployment \
+                        reactapp=${DOCKER_IMAGE}:${DOCKER_TAG}
+
+                        kubectl rollout status deployment/reactapp-deployment
+                    '
+                """
             }
         }
     }
